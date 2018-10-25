@@ -222,7 +222,11 @@ exports.createPages = ({ graphql, actions }) => {
       const blogPosts = _.filter(result.data.allMarkdownRemark.edges, edge => {
         const slug = _.get(edge, `node.fields.slug`)
         const draft = _.get(edge, `node.frontmatter.draft`)
-        if (!slug) return undefined
+
+        // slug is missing
+        if (!slug) {
+          return undefined
+        }
 
         if (_.includes(slug, `/blog/`) && !draft) {
           return edge
@@ -231,9 +235,20 @@ exports.createPages = ({ graphql, actions }) => {
         return undefined
       })
 
+      const blogPostsBeforeToday = _.filter(blogPosts, edge => {
+        const date = _.get(edge, `node.frontmatter.date`)
+
+        // date is in the future
+        if (Date.parse(date) > new Date()) {
+          return undefined
+        }
+
+        return edge
+      })
+
       // Create blog-list pages.
       const postsPerPage = 8
-      const numPages = Math.ceil(blogPosts.length / postsPerPage)
+      const numPages = Math.ceil(blogPostsBeforeToday.length / postsPerPage)
 
       Array.from({ length: numPages }).forEach((_, i) => {
         createPage({
@@ -249,10 +264,12 @@ exports.createPages = ({ graphql, actions }) => {
       })
 
       // Create blog-post pages.
-      blogPosts.forEach((edge, index) => {
-        const next = index === 0 ? null : blogPosts[index - 1].node
+      blogPostsBeforeToday.forEach((edge, index) => {
+        const next = index === 0 ? null : blogPostsBeforeToday[index - 1].node
         const prev =
-          index === blogPosts.length - 1 ? null : blogPosts[index + 1].node
+          index === blogPostsBeforeToday.length - 1
+            ? null
+            : blogPostsBeforeToday[index + 1].node
 
         createPage({
           path: `${edge.node.fields.slug}`, // required
@@ -265,7 +282,7 @@ exports.createPages = ({ graphql, actions }) => {
         })
       })
 
-      const tagLists = blogPosts
+      const tagLists = blogPostsBeforeToday
         .filter(post => _.get(post, `node.frontmatter.tags`))
         .map(post => _.get(post, `node.frontmatter.tags`))
 
